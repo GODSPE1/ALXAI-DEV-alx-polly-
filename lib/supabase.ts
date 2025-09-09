@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types/database";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -10,13 +11,26 @@ if (!supabaseAnonKey) {
   throw new Error("Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
   },
 });
+
+// Export database types
+export type {
+  Database,
+  Poll,
+  PollOption,
+  Vote,
+  CreatePollInput,
+  UpdatePollInput,
+  CreateVoteInput,
+  PollWithOptions,
+  PollResultsResponse,
+} from "./types/database";
 
 // Types for our application
 export interface User {
