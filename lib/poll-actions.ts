@@ -14,41 +14,47 @@ import type {
  */
 export async function createPollAction(formData: FormData) {
   try {
-    // Extract form data
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const expiresAt = formData.get("expires_at") as string;
+    // Helper to extract poll options from formData
+    function extractOptions(fd: FormData): string[] {
+      const opts: string[] = [];
+      let idx = 0;
+      while (fd.has(`option_${idx}`)) {
+        const val = fd.get(`option_${idx}`);
+        if (typeof val === "string" && val.trim()) {
+          opts.push(val.trim());
+        }
+        idx++;
+      }
+      return opts;
+    }
+
+    // Extract and sanitize form data
+    const titleRaw = formData.get("title");
+    const descriptionRaw = formData.get("description");
+    const expiresAtRaw = formData.get("expires_at");
     const allowMultipleVotes = formData.get("allow_multiple_votes") === "on";
     const isAnonymous = formData.get("is_anonymous") === "on";
-    const maxVotesPerUser =
-      parseInt(formData.get("max_votes_per_user") as string) || 1;
+    const maxVotesPerUser = parseInt(formData.get("max_votes_per_user") as string) || 1;
     const userId = formData.get("user_id") as string;
+    const options = extractOptions(formData);
 
-    // Extract options (assuming they come as option_0, option_1, etc.)
-    const options: string[] = [];
-    let optionIndex = 0;
-    while (formData.has(`option_${optionIndex}`)) {
-      const option = formData.get(`option_${optionIndex}`) as string;
-      if (option && option.trim()) {
-        options.push(option.trim());
-      }
-      optionIndex++;
-    }
+    const title = typeof titleRaw === "string" ? titleRaw.trim() : "";
+    const description = typeof descriptionRaw === "string" ? descriptionRaw.trim() : undefined;
+    const expires_at = typeof expiresAtRaw === "string" && expiresAtRaw ? expiresAtRaw : undefined;
 
     // Validate required fields
-    if (!title || title.trim().length === 0) {
+    if (!title) {
       throw new Error("Poll title is required");
     }
-
     if (options.length < 2) {
       throw new Error("Poll must have at least 2 options");
     }
 
-    // Create poll input
+    // Build poll input
     const pollInput: CreatePollInput = {
-      title: title.trim(),
-      description: description?.trim() || undefined,
-      expires_at: expiresAt || undefined,
+      title,
+      description,
+      expires_at,
       allow_multiple_votes: allowMultipleVotes,
       is_anonymous: isAnonymous,
       max_votes_per_user: maxVotesPerUser,
@@ -57,20 +63,16 @@ export async function createPollAction(formData: FormData) {
 
     // Create the poll
     const result = await pollsDb.create(pollInput, userId || undefined);
-
     if (!result.success) {
       throw new Error(result.error?.message || "Failed to create poll");
     }
 
-    // Revalidate the polls page
+    // Revalidate and redirect
     revalidatePath("/polls");
-
-    // Redirect to the new poll
     redirect(`/polls/${result.data!.id}`);
   } catch (error) {
-    throw new Error(
-      error instanceof Error ? error.message : "Unknown error occurred",
-    );
+    const message = error instanceof Error ? error.message : "Unknown error occurred";
+    throw new Error(message);
   }
 }
 
